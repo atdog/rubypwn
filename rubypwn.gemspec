@@ -6,7 +6,8 @@ Gem::Specification.new do |s|
   s.description = "pwn tools"
   s.authors     = ["atdog"]
   s.email       = 'atdog.tw@gmail.com'
-  s.files       = ["lib/rubypwn.rb", "lib/basic.rb", "lib/netcat.rb", "lib/exec.rb", "lib/asm.rb"]
-  s.homepage    = 'http://rubygems.org/gems/rubypwn'
+  s.files         = `git ls-files`.split("\n")
+  s.executables   = `git ls-files -- bin/*`.split("\n").map { |f| File.basename(f) }
+  s.homepage    = 'https://github.com/atdog/rubypwn/'
   s.license     = 'MIT'
 end
