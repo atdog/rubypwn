@@ -6,7 +6,7 @@
 Welcome to rubypwn's documentation!
 ===================================
 
-Contents:
+Content
 
 .. toctree::
    :maxdepth: 2
