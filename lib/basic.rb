@@ -36,3 +36,7 @@ end
 def nop()
     "\x90"
 end
+
+def log(str)
+    $stderr.puts "[-] #{str}"
+end
