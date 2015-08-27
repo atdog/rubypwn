@@ -18,3 +18,7 @@ total 16
  => "b801000000"
 2.2.2 :005 >
 ```
+
+### Documentation
+
+https://rubypwn.readthedocs.org/en/latest/
