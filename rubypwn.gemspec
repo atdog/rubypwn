@@ -1,16 +1,19 @@
 Gem::Specification.new do |s|
   s.name        = 'rubypwn'
-  s.version     = '0.0.5'
+  s.version     = '0.0.6'
   s.date        = '2015-08-26'
-  s.summary     = "pwntools - ruby version"
+  s.summary     = "ruby pwn tools"
   s.description   = <<-DESCRIPTION.strip.gsub(/\s+/, " ")
-    A simple library for CTF pwning challegnges.
+    A simple library for CTF pwning challenges.
     Like Python's pwntools, it's used to help you write exploit quickly.
   DESCRIPTION
-  s.authors     = ["Hung Chi Su"]
+  s.authors     = ["atdog"]
   s.email       = 'atdog.tw@gmail.com'
   s.files         = `git ls-files`.split("\n")
   s.executables   = `git ls-files -- bin/*`.split("\n").map { |f| File.basename(f) }
   s.homepage    = 'https://github.com/atdog/rubypwn/'
   s.license     = 'MIT'
+  s.add_runtime_dependency 'rainbow', '~> 2.0', '>= 2.0.0'
+  s.add_runtime_dependency 'thread', '~> 0.2', '>= 0.2.2'
+  s.add_runtime_dependency 'rest-client', '~> 1.8', '>= 1.8.0'
 end
