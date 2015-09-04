@@ -16,4 +16,5 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency 'rainbow', '~> 2.0', '>= 2.0.0'
   s.add_runtime_dependency 'thread', '~> 0.2', '>= 0.2.2'
   s.add_runtime_dependency 'rest-client', '~> 1.8', '>= 1.8.0'
+  s.add_runtime_dependency 'bindata', '~> 0'
 end
