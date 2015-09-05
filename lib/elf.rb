@@ -24,8 +24,8 @@ end
 
 class Relplt32 < BinData::Record
     endian :little
-    int32 :r_offset
-    int32 :r_info
+    uint32 :r_offset
+    uint32 :r_info
     string :sym_index, :value => lambda{parse_sym_index(r_info)}
     string :type, :value => lambda{parse_type(r_info)}
 
@@ -40,7 +40,7 @@ end
 
 class Relplt64 < BinData::Record
     endian :little
-    int64 :r_offset
+    uint64 :r_offset
     int64 :r_info
     string :sym_index, :value => lambda{parse_sym_index(r_info)}
     string :type, :value => lambda{parse_type(r_info)}
@@ -56,7 +56,7 @@ end
 
 class Relaplt32 < BinData::Record
     endian :little
-    int32 :r_offset
+    uint32 :r_offset
     int32 :r_info
     int32 :r_addend
     string :sym_index, :value => lambda{parse_sym_index(r_info)}
@@ -73,7 +73,7 @@ end
 
 class Relaplt64 < BinData::Record
     endian :little
-    int64 :r_offset
+    uint64 :r_offset
     int64 :r_info
     int64 :r_addend
     string :sym_index, :value => lambda{parse_sym_index(r_info)}
@@ -108,9 +108,9 @@ class ElfParser < BinData::Record
     # This is the memory address of the entry point from where the process starts executing. This field is either 32 or 64 bits long depending on the format defined earlier.
     choice :e_entry, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
     # Points to the start of the program header table. It usually follows the fi header immediately making the offset 0x40 for 64-bit ELF executables.
-    choice :e_phoff, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
+    choice :e_phoff, :selection => lambda{e_ident.ei_class}, :choices => {1 => :uint32, 2 => :uint64}
     # Points to the start of the section header table.
-    choice :e_shoff, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
+    choice :e_shoff, :selection => lambda{e_ident.ei_class}, :choices => {1 => :uint32, 2 => :uint64}
     # Interpretation of this field depends on the target architecture.
     int32 :e_flags
     # Contains the size of this header, normally 64 bytes for 64-bit and 52 for 32-bit format.
@@ -154,7 +154,7 @@ class ElfParser < BinData::Record
         # Section virtual addr at execution
         choice :sh_addr, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
         # Section file offset
-        choice :sh_offset, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
+        choice :sh_offset, :selection => lambda{e_ident.ei_class}, :choices => {1 => :uint32, 2 => :uint64}
         # Section size in bytes
         choice :sh_size, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
         # Link to another section
@@ -374,7 +374,7 @@ class Elf
         end
         
         rel.each do |r|
-            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset
+            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset.to_i
         end
         result
     end
