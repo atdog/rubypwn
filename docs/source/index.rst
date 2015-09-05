@@ -1,7 +1,7 @@
 rubypwn
 ====================================
 
-test
+pwntools for ruby developer
 
 Getting Started
 ---------------
@@ -24,6 +24,7 @@ All documented module in rubypwn.
 
    basic
    asm
+   elf
 
 Indices and tables
 ==================
