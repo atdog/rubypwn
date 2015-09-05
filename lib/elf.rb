@@ -187,6 +187,14 @@ class ElfParser < BinData::Record
         array 1, :type => :relaplt32, :initial_length => 0
         array 2, :type => :relaplt64, :initial_length => 0
     end
+    choice :reldyn, :selection => lambda{e_ident.ei_class} do
+        array 1, :type => :relplt32, :initial_length => 0
+        array 2, :type => :relplt64, :initial_length => 0
+    end
+    choice :reladyn, :selection => lambda{e_ident.ei_class} do
+        array 1, :type => :relaplt32, :initial_length => 0
+        array 2, :type => :relaplt64, :initial_length => 0
+    end
 
     def parse_bits(ei_class)
         ei_class == 1 ? 32 : 64
@@ -342,24 +350,40 @@ class Elf
     end
 
     def parse_relplt(binary, elf)
-        relplt = nil
+        plt = nil
         elf.e_shnum.times do |i|
             if elf.sh[i].name_str.to_s == ".rel.plt"
                 size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
                 if elf.e_ident[:ei_class] == 1
-                    relplt = BinData::Array.new(:type => :relplt32, :initial_length => size)
+                    plt = BinData::Array.new(:type => :relplt32, :initial_length => size)
                 else
-                    relplt = BinData::Array.new(:type => :relplt64, :initial_length => size)
+                    plt = BinData::Array.new(:type => :relplt64, :initial_length => size)
                 end
-                elf.relplt.assign relplt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+                elf.relplt.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+            elsif elf.sh[i].name_str.to_s == ".rel.dyn"
+                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                if elf.e_ident[:ei_class] == 1
+                    plt = BinData::Array.new(:type => :relplt32, :initial_length => size)
+                else
+                    plt = BinData::Array.new(:type => :relplt64, :initial_length => size)
+                end
+                elf.reldyn.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
             elsif elf.sh[i].name_str.to_s == ".rela.plt"
                 size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
                 if elf.e_ident[:ei_class] == 1
-                    relplt = BinData::Array.new(:type => :relaplt32, :initial_length => size)
+                    plt = BinData::Array.new(:type => :relaplt32, :initial_length => size)
                 else
-                    relplt = BinData::Array.new(:type => :relaplt64, :initial_length => size)
+                    plt = BinData::Array.new(:type => :relaplt64, :initial_length => size)
                 end
-                elf.relaplt.assign relplt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+                elf.relaplt.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+            elsif elf.sh[i].name_str.to_s == ".rela.dyn"
+                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                if elf.e_ident[:ei_class] == 1
+                    plt = BinData::Array.new(:type => :relaplt32, :initial_length => size)
+                else
+                    plt = BinData::Array.new(:type => :relaplt64, :initial_length => size)
+                end
+                elf.reladyn.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
             end
         end
     end
@@ -367,14 +391,21 @@ class Elf
     def gen_gotplt(elf)
         result = {}
         rel = nil
-        if elf.relplt.size > 0
-            rel = elf.relplt
-        elsif elf.relaplt.size > 0
-            rel = elf.relaplt
-        end
         
-        rel.each do |r|
+        elf.relplt.each do |r|
             result[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset.to_i
+        end
+
+        elf.relaplt.each do |r|
+            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset.to_i
+        end
+
+        elf.reldyn.each do |r|
+            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value
+        end
+
+        elf.reladyn.each do |r|
+            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value
         end
         result
     end
@@ -382,4 +413,4 @@ end
 
 #require 'pp'
 #e = Elf.new ARGV[0]
-#pp e.gotplt["fgets"]
+#pp e.gotplt["__free_hook"]
