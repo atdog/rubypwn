@@ -1,6 +1,92 @@
 require 'bindata'
-require 'pp'
 
+class Symtab32 < BinData::Record
+    endian :little
+    int32 :st_name        #/* Symbol name (string tbl index) */
+    int32 :st_value       #/* Symbol value */
+    int32 :st_size        #/* Symbol size */
+    int8 :st_info         #/* Symbol type and binding */
+    int8 :st_other        #/* Symbol visibility */
+    int16 :st_shndx       #/* Section index */
+    string :name_str
+end
+
+class Symtab64 < BinData::Record
+    endian :little
+    int32 :st_name        #/* Symbol name (string tbl index) */
+    int8 :st_info         #/* Symbol type and binding */
+    int8 :st_other        #/* Symbol visibility */
+    int16 :st_shndx       #/* Section index */
+    int64 :st_value       #/* Symbol value */
+    int64 :st_size        #/* Symbol size */
+    string :name_str
+end
+
+class Relplt32 < BinData::Record
+    endian :little
+    int32 :r_offset
+    int32 :r_info
+    string :sym_index, :value => lambda{parse_sym_index(r_info)}
+    string :type, :value => lambda{parse_type(r_info)}
+
+    def parse_sym_index(r_info)
+        r_info >> 8
+    end
+
+    def parse_type(r_info)
+        r_info & 0xff
+    end
+end
+
+class Relplt64 < BinData::Record
+    endian :little
+    int64 :r_offset
+    int64 :r_info
+    string :sym_index, :value => lambda{parse_sym_index(r_info)}
+    string :type, :value => lambda{parse_type(r_info)}
+
+    def parse_sym_index(r_info)
+        r_info >> 32
+    end
+
+    def parse_type(r_info)
+        r_info & 0xffffffff
+    end
+end
+
+class Relaplt32 < BinData::Record
+    endian :little
+    int32 :r_offset
+    int32 :r_info
+    int32 :r_addend
+    string :sym_index, :value => lambda{parse_sym_index(r_info)}
+    string :type, :value => lambda{parse_type(r_info)}
+
+    def parse_sym_index(r_info)
+        r_info >> 8
+    end
+
+    def parse_type(r_info)
+        r_info & 0xff
+    end
+end
+
+class Relaplt64 < BinData::Record
+    endian :little
+    int64 :r_offset
+    int64 :r_info
+    int64 :r_addend
+    string :sym_index, :value => lambda{parse_sym_index(r_info)}
+    string :type, :value => lambda{parse_type(r_info)}
+
+    def parse_sym_index(r_info)
+        r_info >> 32
+    end
+
+    def parse_type(r_info)
+        r_info & 0xffffffff
+    end
+end
 class ElfParser < BinData::Record
     endian :little
     # magic number
@@ -89,6 +175,18 @@ class ElfParser < BinData::Record
     int8 :bits, :value => lambda{parse_bits(e_ident.ei_class)}
     string :arch, :value => lambda{parse_arch(e_machine)}
     string :type, :value => lambda{parse_type(e_type)}
+    choice :symtab, :selection => lambda{e_ident.ei_class} do
+        array 1, :type => :symtab32, :initial_length => 0
+        array 2, :type => :symtab64, :initial_length => 0
+    end
+    choice :relplt, :selection => lambda{e_ident.ei_class} do
+        array 1, :type => :relplt32, :initial_length => 0
+        array 2, :type => :relplt64, :initial_length => 0
+    end
+    choice :relaplt, :selection => lambda{e_ident.ei_class} do
+        array 1, :type => :relaplt32, :initial_length => 0
+        array 2, :type => :relaplt64, :initial_length => 0
+    end
 
     def parse_bits(ei_class)
         ei_class == 1 ? 32 : 64
@@ -185,41 +283,21 @@ class ElfParser < BinData::Record
     end
 end
 
-
-class Symtab32 < BinData::Record
-    endian :little
-    int32 :st_name        #/* Symbol name (string tbl index) */
-    int32 :st_value       #/* Symbol value */
-    int32 :st_size        #/* Symbol size */
-    int8 :st_info         #/* Symbol type and binding */
-    int8 :st_other        #/* Symbol visibility */
-    int16 :st_shndx       #/* Section index */
-    string :name_str
-end
-
-class Symtab64 < BinData::Record
-    endian :little
-    int32 :st_name        #/* Symbol name (string tbl index) */
-    int8 :st_info         #/* Symbol type and binding */
-    int8 :st_other        #/* Symbol visibility */
-    int16 :st_shndx       #/* Section index */
-    int64 :st_value       #/* Symbol value */
-    int64 :st_size        #/* Symbol size */
-    string :name_str
-end
-
 class Elf
+    attr_accessor :gotplt
 
     def initialize(file)
         # To avoid unicode
         binary = File.read(file).force_encoding('binary')
         # To fix bugs leading eof, that's why here is a newline ...
-        elf = ElfParser.read(binary + "\n")
+        @elf = ElfParser.read binary + "\n" 
         # Section name assignment
-        assign_section_name(binary, elf)
+        assign_section_name binary, @elf
         # parse symbol table
-        parse_symtab(binary, elf)
-        #pp elf
+        parse_symtab binary, @elf
+        # parse rel.plt
+        parse_relplt binary, @elf
+        @gotplt = gen_gotplt @elf
     end
 
     private
@@ -237,10 +315,11 @@ class Elf
         symtab = nil
         elf.e_shnum.times do |i|
             if elf.sh[i].name_str.to_s == ".dynsym"
+                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
                 if elf.e_ident[:ei_class] == 1
-                    symtab = BinData::Array.new(:type => :symtab32, :initial_length => elf.sh[i].sh_entsize)
+                    symtab = BinData::Array.new(:type => :symtab32, :initial_length => size)
                 else
-                    symtab = BinData::Array.new(:type => :symtab64, :initial_length => elf.sh[i].sh_entsize)
+                    symtab = BinData::Array.new(:type => :symtab64, :initial_length => size)
                 end
                 symtab = symtab.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
             end
@@ -259,10 +338,48 @@ class Elf
             symtab[i].name_str.assign BinData::Stringz.read strtab[symtab[i].st_name..-1]
         end
 
-        pp symtab
-        symtab
+        elf.symtab.assign symtab
     end
 
+    def parse_relplt(binary, elf)
+        relplt = nil
+        elf.e_shnum.times do |i|
+            if elf.sh[i].name_str.to_s == ".rel.plt"
+                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                if elf.e_ident[:ei_class] == 1
+                    relplt = BinData::Array.new(:type => :relplt32, :initial_length => size)
+                else
+                    relplt = BinData::Array.new(:type => :relplt64, :initial_length => size)
+                end
+                elf.relplt.assign relplt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+            elsif elf.sh[i].name_str.to_s == ".rela.plt"
+                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                if elf.e_ident[:ei_class] == 1
+                    relplt = BinData::Array.new(:type => :relaplt32, :initial_length => size)
+                else
+                    relplt = BinData::Array.new(:type => :relaplt64, :initial_length => size)
+                end
+                elf.relaplt.assign relplt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+            end
+        end
+    end
+
+    def gen_gotplt(elf)
+        result = {}
+        rel = nil
+        if elf.relplt.size > 0
+            rel = elf.relplt
+        elsif elf.relaplt.size > 0
+            rel = elf.relaplt
+        end
+        
+        rel.each do |r|
+            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset
+        end
+        result
+    end
 end
 
-e = Elf.new ARGV[0]
+#require 'pp'
+#e = Elf.new ARGV[0]
+#pp e.gotplt["fgets"]
