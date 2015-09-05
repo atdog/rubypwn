@@ -401,11 +401,11 @@ class Elf
         end
 
         elf.reldyn.each do |r|
-            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value
+            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value.to_i
         end
 
         elf.reladyn.each do |r|
-            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value
+            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value.to_i
         end
         result
     end
