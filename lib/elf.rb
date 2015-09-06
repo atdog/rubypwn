@@ -277,7 +277,7 @@ class Elf
         # To avoid unicode
         binary = File.read(file).force_encoding('binary')
         # To fix bugs leading eof, that's why here is a newline ...
-        elf = ElfParser.read binary + "\n" 
+        elf = ElfParser.read binary + "\n"
         # parse information we need
         extract_info binary, elf
     end
