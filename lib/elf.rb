@@ -331,13 +331,13 @@ class Elf
                 end
             # STRTAB
             elsif d.d_tag == 5
-                @dynamic["strtab"]= d.d_val
+                @dynamic["strtab"]= d.d_val.to_i
             # SYMTAB
             elsif d.d_tag == 6
-                @dynamic["symtab"]= d.d_val
+                @dynamic["symtab"]= d.d_val.to_i
             # JMPREL
             elsif d.d_tag == 0x17
-                @dynamic["jmprel"]= d.d_val
+                @dynamic["jmprel"]= d.d_val.to_i
             end
         end
     end
@@ -420,14 +420,14 @@ class Elf
         @got = {}
         rel.each do |r|
             if r.type.to_i == 7 # JMP_SLOT
-                @got[elf.symtab[r.sym_index.to_i].name_str] = r.r_offset
+                @got[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset.to_i
             end
         end
         @global = Hash.new {|h, k| h[k] = Hash.new}
         reldyn.each do |r|
             if r.type.to_i == 6 # GLOB_DAT
-                @global[elf.symtab[r.sym_index.to_i].name_str]["offset"] = r.r_offset
-                @global[elf.symtab[r.sym_index.to_i].name_str]["value"] = elf.symtab[r.sym_index.to_i].st_value
+                @global[elf.symtab[r.sym_index.to_i].name_str.to_s]["offset"] = r.r_offset.to_i
+                @global[elf.symtab[r.sym_index.to_i].name_str.to_s]["value"] = elf.symtab[r.sym_index.to_i].st_value.to_i
             end
         end
     end
