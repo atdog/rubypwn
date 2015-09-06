@@ -1,5 +1,17 @@
 require 'bindata'
 
+class Dynamic32 < BinData::Record
+    endian :little
+    int32 :d_tag
+    uint32 :d_val
+end
+
+class Dynamic64 < BinData::Record
+    endian :little
+    int64 :d_tag
+    uint64 :d_val
+end
+
 class Symtab32 < BinData::Record
     endian :little
     int32 :st_name        #/* Symbol name (string tbl index) */
@@ -87,6 +99,7 @@ class Relaplt64 < BinData::Record
         r_info & 0xffffffff
     end
 end
+
 class ElfParser < BinData::Record
     endian :little
     # magic number
@@ -126,26 +139,7 @@ class ElfParser < BinData::Record
     # Section header string table index
     int16 :e_shstrndx
     skip :length => lambda{e_shoff - e_ehsize}
-    # Program header table
-    #array :ph, :initial_length => :e_phnum do
-        #int32 :p_type
-        ## Segment bit mask (RWX)
-        #int32 :p_flags
-        ## Segment file offset
-        #choice :p_offset, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32le, 2 => :int64le}
-        ## Segment virtual address
-        #choice :p_vaddr, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32le, 2 => :int64le}
-        ## Segment physical address
-        #choice :p_paddr, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32le, 2 => :int64le}
-        ## Segment size in file
-        #choice :p_filesz, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32le, 2 => :int64le}
-        ## Segment size in memory
-        #choice :p_memsz, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32le, 2 => :int64le}
-        ## Segment alignment
-        #choice :p_align, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32le, 2 => :int64le}
-        ##string :p_segment, :read_length => lambda{p_filesz - e_phentsize}
-    #end
-    # Contains index of the section header tab entry that contains the section names.
+
     array :sh, :initial_length => lambda{e_shnum} do
         # Section name (string tbl index)
         int32 :sh_name
@@ -178,22 +172,6 @@ class ElfParser < BinData::Record
     choice :symtab, :selection => lambda{e_ident.ei_class} do
         array 1, :type => :symtab32, :initial_length => 0
         array 2, :type => :symtab64, :initial_length => 0
-    end
-    choice :relplt, :selection => lambda{e_ident.ei_class} do
-        array 1, :type => :relplt32, :initial_length => 0
-        array 2, :type => :relplt64, :initial_length => 0
-    end
-    choice :relaplt, :selection => lambda{e_ident.ei_class} do
-        array 1, :type => :relaplt32, :initial_length => 0
-        array 2, :type => :relaplt64, :initial_length => 0
-    end
-    choice :reldyn, :selection => lambda{e_ident.ei_class} do
-        array 1, :type => :relplt32, :initial_length => 0
-        array 2, :type => :relplt64, :initial_length => 0
-    end
-    choice :reladyn, :selection => lambda{e_ident.ei_class} do
-        array 1, :type => :relaplt32, :initial_length => 0
-        array 2, :type => :relaplt64, :initial_length => 0
     end
 
     def parse_bits(ei_class)
@@ -292,29 +270,75 @@ class ElfParser < BinData::Record
 end
 
 class Elf
-    attr_accessor :gotplt
+    #attr_accessor :gotplt
+    attr_accessor :arch, :bits, :dynamic, :got, :global
 
     def initialize(file)
         # To avoid unicode
         binary = File.read(file).force_encoding('binary')
         # To fix bugs leading eof, that's why here is a newline ...
-        @elf = ElfParser.read binary + "\n" 
-        # Section name assignment
-        assign_section_name binary, @elf
-        # parse symbol table
-        parse_symtab binary, @elf
-        # parse rel.plt
-        parse_relplt binary, @elf
-        @gotplt = gen_gotplt @elf
+        elf = ElfParser.read binary + "\n" 
+        # parse information we need
+        extract_info binary, elf
     end
 
     private
-    def assign_section_name(binary, elf)
+
+    def extract_info(binary, elf)
+        @arch = elf.arch.to_s
+        @bits = elf.bits.to_i
+        # parse section name
+        parse_section_name binary, elf
+        # parse symbol table
+        parse_symtab binary, elf
+        # Parse dynamic section
+        parse_dynamic_constant binary, elf
+        ## parse rel.plt
+        parse_relplt binary, elf
+    end
+
+    def parse_section_name(binary, elf)
         strtab_offset = elf.sh[elf.e_shstrndx].sh_offset.to_i
         strtab = binary[(strtab_offset)..-1]
         elf.e_shnum.times do |i|
             sh_name = elf.sh[i].sh_name.to_i
             elf.sh[i].name_str.assign BinData::Stringz.read strtab[sh_name..-1]
+        end
+    end
+
+    def parse_dynamic_constant(binary, elf)
+        dynamic = nil
+        elf.e_shnum.times do |i|
+            content = binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+            if elf.sh[i].sh_type == 6 # DYNAMIC
+                size = elf.sh[i].sh_size / elf.sh[i].sh_entsize
+                if @bits == 32
+                    dynamic = BinData::Array.new(:type => :dynamic32, :initial_length => size)
+                else
+                    dynamic = BinData::Array.new(:type => :dynamic64, :initial_length => size)
+                end
+                dynamic.read content
+            end
+        end
+        @dynamic = {}
+        dynamic.each do |d|
+            # PLTREL
+            if d.d_tag == 20 
+                if d.d_val == 7
+                    @dynamic["rel_type"]= "RELA"
+                elsif d.d_val == 17
+                    @dynamic["rel_type"]= "REL"
+                end
+            # STRTAB
+            elsif d.d_tag == 5
+                @dynamic["strtab"]= d.d_val
+            # SYMTAB
+            elsif d.d_tag == 6
+                @dynamic["symtab"]= d.d_val
+            # JMPREL
+            elsif d.d_tag == 0x17
+                @dynamic["jmprel"]= d.d_val
+            end
         end
     end
 
@@ -350,67 +374,65 @@ class Elf
     end
 
     def parse_relplt(binary, elf)
-        plt = nil
+        rel = nil
+        reldyn = nil
         elf.e_shnum.times do |i|
-            if elf.sh[i].name_str.to_s == ".rel.plt"
-                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
-                if elf.e_ident[:ei_class] == 1
-                    plt = BinData::Array.new(:type => :relplt32, :initial_length => size)
-                else
-                    plt = BinData::Array.new(:type => :relplt64, :initial_length => size)
+            if @dynamic["rel_type"] == "REL"
+                if elf.sh[i].name_str == ".rel.plt"
+                    size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                    if elf.e_ident[:ei_class] == 1
+                        rel = BinData::Array.new(:type => :relplt32, :initial_length => size)
+                    else
+                        rel = BinData::Array.new(:type => :relplt64, :initial_length => size)
+                    end
+                    rel.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+                elsif elf.sh[i].name_str == ".rel.dyn"
+                    size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                    if @bits == 32
+                        reldyn = BinData::Array.new(:type => :relplt32, :initial_length => size)
+                    else
+                        reldyn = BinData::Array.new(:type => :relplt64, :initial_length => size)
+                    end
+                    reldyn.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
                 end
-                elf.relplt.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
-            elsif elf.sh[i].name_str.to_s == ".rel.dyn"
-                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
-                if elf.e_ident[:ei_class] == 1
-                    plt = BinData::Array.new(:type => :relplt32, :initial_length => size)
-                else
-                    plt = BinData::Array.new(:type => :relplt64, :initial_length => size)
+            elsif @dynamic["rel_type"] == "RELA"
+                if elf.sh[i].name_str == ".rela.plt"
+                    size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                    if @bits == 32
+                        rel = BinData::Array.new(:type => :relaplt32, :initial_length => size)
+                    else
+                        rel = BinData::Array.new(:type => :relaplt64, :initial_length => size)
+                    end
+                    rel.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
+                elsif elf.sh[i].name_str == ".rela.dyn"
+                    size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
+                    if @bits == 32
+                        reldyn = BinData::Array.new(:type => :relaplt32, :initial_length => size)
+                    else
+                        reldyn = BinData::Array.new(:type => :relaplt64, :initial_length => size)
+                    end
+                    reldyn.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
                 end
-                elf.reldyn.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
-            elsif elf.sh[i].name_str.to_s == ".rela.plt"
-                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
-                if elf.e_ident[:ei_class] == 1
-                    plt = BinData::Array.new(:type => :relaplt32, :initial_length => size)
-                else
-                    plt = BinData::Array.new(:type => :relaplt64, :initial_length => size)
-                end
-                elf.relaplt.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
-            elsif elf.sh[i].name_str.to_s == ".rela.dyn"
-                size = elf.sh[i].sh_size/elf.sh[i].sh_entsize
-                if elf.e_ident[:ei_class] == 1
-                    plt = BinData::Array.new(:type => :relaplt32, :initial_length => size)
-                else
-                    plt = BinData::Array.new(:type => :relaplt64, :initial_length => size)
-                end
-                elf.reladyn.assign plt.read binary[elf.sh[i].sh_offset, elf.sh[i].sh_size]
             end
         end
-    end
-
-    def gen_gotplt(elf)
-        result = {}
-        rel = nil
         
-        elf.relplt.each do |r|
-            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset.to_i
+        # extract information
+        @got = {}
+        rel.each do |r|
+            if r.type.to_i == 7 # JMP_SLOT
+                @got[elf.symtab[r.sym_index.to_i].name_str] = r.r_offset
+            end
         end
-
-        elf.relaplt.each do |r|
-            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = r.r_offset.to_i
+        @global = Hash.new {|h, k| h[k] = Hash.new}
+        reldyn.each do |r|
+            if r.type.to_i == 6 # GLOB_DAT
+                @global[elf.symtab[r.sym_index.to_i].name_str]["offset"] = r.r_offset
+                @global[elf.symtab[r.sym_index.to_i].name_str]["value"] = elf.symtab[r.sym_index.to_i].st_value
+            end
         end
-
-        elf.reldyn.each do |r|
-            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value.to_i
-        end
-
-        elf.reladyn.each do |r|
-            result[elf.symtab[r.sym_index.to_i].name_str.to_s] = elf.symtab[r.sym_index.to_i].st_value.to_i
-        end
-        result
     end
 end
 
 #require 'pp'
 #e = Elf.new ARGV[0]
-#pp e.gotplt["__free_hook"]
+#pp e
