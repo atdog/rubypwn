@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'rubypwn'
-  s.version     = '0.0.9'
+  s.version     = '0.0.10'
   s.date        = '2015-09-06'
   s.summary     = "ruby pwn tools"
   s.description   = <<-DESCRIPTION.strip.gsub(/\s+/, " ")
