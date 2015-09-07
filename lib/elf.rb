@@ -146,7 +146,7 @@ class ElfParser < BinData::Record
         int32 :sh_type
         choice :sh_flags, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
         # Section virtual addr at execution
-        choice :sh_addr, :selection => lambda{e_ident.ei_class}, :choices => {1 => :int32, 2 => :int64}
+        choice :sh_addr, :selection => lambda{e_ident.ei_class}, :choices => {1 => :uint32, 2 => :uint64}
         # Section file offset
         choice :sh_offset, :selection => lambda{e_ident.ei_class}, :choices => {1 => :uint32, 2 => :uint64}
         # Section size in bytes
@@ -271,7 +271,7 @@ end
 
 class Elf
     #attr_accessor :gotplt
-    attr_accessor :arch, :bits, :dynamic, :got, :global
+    attr_accessor :arch, :bits, :dynamic, :sections, :got, :global
 
     def initialize(file)
         # To avoid unicode
@@ -300,9 +300,11 @@ class Elf
     def parse_section_name(binary, elf)
         strtab_offset = elf.sh[elf.e_shstrndx].sh_offset.to_i
         strtab = binary[(strtab_offset)..-1]
+        @sections = {}
         elf.e_shnum.times do |i|
             sh_name = elf.sh[i].sh_name.to_i
             elf.sh[i].name_str.assign BinData::Stringz.read strtab[sh_name..-1]
+            @sections[elf.sh[i].name_str.to_s] = elf.sh[i].sh_addr.to_i
         end
     end
 
