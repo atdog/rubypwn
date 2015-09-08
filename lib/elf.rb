@@ -300,11 +300,17 @@ class Elf
     def parse_section_name(binary, elf)
         strtab_offset = elf.sh[elf.e_shstrndx].sh_offset.to_i
         strtab = binary[(strtab_offset)..-1]
-        @sections = {}
+        @sections = Hash.new{|h, k| h[k] = Hash.new }
         elf.e_shnum.times do |i|
             sh_name = elf.sh[i].sh_name.to_i
             elf.sh[i].name_str.assign BinData::Stringz.read strtab[sh_name..-1]
-            @sections[elf.sh[i].name_str.to_s] = elf.sh[i].sh_addr.to_i
+            flag = "r"
+            flag += (elf.sh[i].sh_flags & 1) > 0 ? "w" : "-"
+            flag += (elf.sh[i].sh_flags & 4) > 0 ? "x" : "-"
+            puts elf.sh[i].flag_str
+
+            @sections[elf.sh[i].name_str.to_s]["offset"] = elf.sh[i].sh_addr.to_i
+            @sections[elf.sh[i].name_str.to_s]["flag"] = flag
         end
     end
 
@@ -325,7 +331,7 @@ class Elf
         @dynamic = {}
         dynamic.each do |d|
             # PLTREL
-            if d.d_tag == 20 
+            if d.d_tag == 20
                 if d.d_val == 7
                     @dynamic["rel_type"]= "RELA"
                 elsif d.d_val == 17
@@ -417,7 +423,7 @@ class Elf
                 end
             end
         end
-        
+
         # extract information
         @got = {}
         rel.each do |r|
