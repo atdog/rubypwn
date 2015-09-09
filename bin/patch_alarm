@@ -1,13 +1,24 @@
 #!/usr/bin/env ruby
 #
 require 'rubypwn'
+require 'fileutils'
 require 'pp'
 
 if ARGV.size != 1
     puts "%s binary" % $0
     exit
 end
+
 filename = ARGV[0]
 
+# Get the section size and offset of STRTAB
 e = Elf.new filename
-pp e.sections[".dynstr"]
+offset = e.sections[".dynstr"].offset
+size = e.sections[".dynstr"].size
+
+# Copy as new file for patching
+new_filename = filename + ".patch"
+FileUtils.copy filename, new_filename
+
+binary = File.read(new_filename).force_encoding("binary")
+pp binary[offset, size]
