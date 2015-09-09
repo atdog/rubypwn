@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+#
+require 'rubypwn'
+require 'pp'
+
+if ARGV.size != 1
+    puts "%s binary" % $0
+    exit
+end
+filename = ARGV[0]
+
+e = Elf.new filename
+pp e.sections[".dynstr"]
