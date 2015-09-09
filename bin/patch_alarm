@@ -15,6 +15,7 @@ e = Elf.new filename
 off_dynstr = e.sections[".dynstr"]["offset"]
 size = e.sections[".dynstr"]["size"]
 
+# append .patch as new filename
 new_filename = filename + ".patch"
 
 binary = File.read(filename).force_encoding("binary")
@@ -28,6 +29,8 @@ if not off_alarm.nil?
     File.open(new_filename, "w") do |fh|
         fh.write binary
     end
+
+    # remember to set executable for user
     FileUtils.chmod "a+x", new_filename
     puts "Done."
 else
