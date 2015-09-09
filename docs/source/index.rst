@@ -26,6 +26,17 @@ All documented module in rubypwn.
    asm
    elf
 
+Executables Index
+-----------------
+
+All documented executable binary in rubypwn
+
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   patch_alarm
+
 Indices and tables
 ==================
 
