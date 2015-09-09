@@ -307,7 +307,6 @@ class Elf
             flag = "r"
             flag += (elf.sh[i].sh_flags & 1) > 0 ? "w" : "-"
             flag += (elf.sh[i].sh_flags & 4) > 0 ? "x" : "-"
-            puts elf.sh[i].flag_str
 
             @sections[elf.sh[i].name_str.to_s]["offset"] = elf.sh[i].sh_addr.to_i
             @sections[elf.sh[i].name_str.to_s]["flag"] = flag
