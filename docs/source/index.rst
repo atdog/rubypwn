@@ -26,7 +26,7 @@ All documented module in rubypwn.
    asm
    elf
 
-Executables Index
+Executable Index
 -----------------
 
 All documented executable binary in rubypwn
