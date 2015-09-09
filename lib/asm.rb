@@ -4,7 +4,7 @@ require 'base64'
 
 class Asm
     # Supported Format: hex, c, binary
-    def self.compile(code, arch="i386", format="hex")
+    def self.compile(code, arch:"i386", format:"hex")
         r = RestClient.post 'http://atdog.tw/asm/compile', :code => code, :arch => arch, :format => format
         r = JSON.parse r
         if r['result'] == 1
