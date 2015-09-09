@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name        = 'rubypwn'
-  s.version     = '0.0.11'
-  s.date        = '2015-09-08'
+  s.version     = '0.0.12'
+  s.date        = '2015-09-09'
   s.summary     = "ruby pwn tools"
   s.description   = <<-DESCRIPTION.strip.gsub(/\s+/, " ")
     A simple library for CTF pwning challenges.
