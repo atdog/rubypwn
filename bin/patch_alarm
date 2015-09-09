@@ -2,7 +2,6 @@
 #
 require 'rubypwn'
 require 'fileutils'
-require 'pp'
 
 if ARGV.size != 1
     puts "%s binary" % $0
@@ -13,12 +12,25 @@ filename = ARGV[0]
 
 # Get the section size and offset of STRTAB
 e = Elf.new filename
-offset = e.sections[".dynstr"].offset
-size = e.sections[".dynstr"].size
+off_dynstr = e.sections[".dynstr"]["offset"]
+size = e.sections[".dynstr"]["size"]
 
-# Copy as new file for patching
 new_filename = filename + ".patch"
-FileUtils.copy filename, new_filename
 
-binary = File.read(new_filename).force_encoding("binary")
-pp binary[offset, size]
+binary = File.read(filename).force_encoding("binary")
+
+# find alarm in strtab, patch it.
+off_alarm = binary[off_dynstr, size].index "\x00alarm\x00"
+
+if not off_alarm.nil?
+    binary[off_dynstr + off_alarm + 1, 5] = "isnan"
+
+    File.open(new_filename, "w") do |fh|
+        fh.write binary
+    end
+    FileUtils.chmod "a+x", new_filename
+    puts "Done."
+else
+    puts 'No "alarm" found.'
+end
+
