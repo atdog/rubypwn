@@ -45,7 +45,6 @@ class Exec
 
     def interactive
         loop do
-            fail "Server disconnected." if @o.eof?
             r = IO.select [@o, $stdin]
             if r[0].include? @o
                 read 1
