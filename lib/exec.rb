@@ -4,24 +4,24 @@ class Exec
     public
     def initialize(cmd)
         handle_exception
-        @@i, @@o, s = Open3.popen2(cmd)
+        @i, @o, s = Open3.popen2(cmd)
     end
 
     def read(size)
-        data = @@o.read size
+        data = @o.read size
         write_flush $stdout, data
         data
     end
 
     def readpartial(size)
-        data = @@o.readpartial size
+        data = @o.readpartial size
         write_flush $stdout, data
         data
     end
 
     def write(data)
         write_flush $stdout, data
-        write_flush @@i, data
+        write_flush @i, data
     end
 
     def puts(data)
@@ -35,7 +35,7 @@ class Exec
     def read_until(str)
         result = ""
         loop do
-            result << @@o.read(1)
+            result << @o.read(1)
             if result.end_with? str
                 write_flush $stdout, result
                 return result
@@ -45,11 +45,15 @@ class Exec
 
     def interactive
         loop do
-            r = IO.select [@@o, $stdin]
-            if r[0].include? @@o
+            if @o.eof?
+                puts "client disconnected."
+                exit
+            end
+            r = IO.select [@o, $stdin]
+            if r[0].include? @o
                 read 1
             elsif r[0].include? $stdin
-                @@i.write $stdin.read(1)
+                @i.write $stdin.read(1)
             end
         end
     end
