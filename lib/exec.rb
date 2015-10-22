@@ -45,10 +45,7 @@ class Exec
 
     def interactive
         loop do
-            if @o.eof?
-                puts "client disconnected."
-                exit
-            end
+            fail "Server disconnected." if @o.eof?
             r = IO.select [@o, $stdin]
             if r[0].include? @o
                 read 1
