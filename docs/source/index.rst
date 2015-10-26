@@ -12,6 +12,7 @@ Getting Started
 
    about
    getting_started
+   format_string
 
 Module Index
 ------------
