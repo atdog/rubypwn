@@ -20,6 +20,8 @@ class Exec ::
     2.2.2 :003 > e.gets
     Makefile
      => "Makefile\n"
+    2.2.2 :004 > e = Exec.new "ls", debug: false, color: false
+     => #<Exec:0x007f96742814e8>
 
 class Netcat ::
 
