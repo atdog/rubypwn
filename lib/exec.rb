@@ -1,26 +1,30 @@
 require 'open3'
+require 'rainbow/ext/string'
 
 class Exec
+    attr_accessor :debug, :color
+
     public
-    def initialize(cmd)
+    def initialize(cmd, **options)
         handle_exception
         @i, @o, s = Open3.popen2(cmd)
+        # Debug msg
+        @debug = (options.has_key? :debug) ? options[:debug] : true
+        # Log color
+        Rainbow.enabled = false if options[:color] == false
     end
 
     def read(size)
-        data = @o.read size
-        write_flush $stdout, data
-        data
+        @o.read(size).tap {|data| write_flush $stdout, data.color(:cyan) if @debug}
     end
 
     def readpartial(size)
-        data = @o.readpartial size
-        write_flush $stdout, data
-        data
+        @o.readpartial(size).tap {|data| write_flush $stdout, data.color(:cyan) if @debug}
     end
 
     def write(data)
-        write_flush $stdout, data
+        data = data.to_s if data.is_a? Integer
+        write_flush $stdout, data.color(:yellow) if @debug
         write_flush @i, data
     end
 
@@ -37,7 +41,7 @@ class Exec
         loop do
             result << @o.read(1)
             if result.end_with? str
-                write_flush $stdout, result
+                write_flush $stdout, result if @debug
                 return result
             end
         end
