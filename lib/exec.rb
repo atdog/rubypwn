@@ -41,7 +41,7 @@ class Exec
         loop do
             result << @o.read(1)
             if result.end_with? str
-                write_flush $stdout, result if @debug
+                write_flush $stdout, result.color(:cyan) if @debug
                 return result
             end
         end
