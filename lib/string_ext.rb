@@ -1,5 +1,13 @@
 class String
-    require 'pp'
+
+    def ^( key )
+        b1 = self.unpack("C*")
+        b2 = key.unpack("C*")
+        mul = (b1.length.to_f / b2.length.to_f).ceil
+        b2 = b2 * mul
+        b1.zip(b2).map{ |a,b| a^b }.pack("C*")
+    end
+
     def fmtstr(value, index, **options)
         # initialize
         bytes = 1
